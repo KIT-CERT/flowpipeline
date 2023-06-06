@@ -8,7 +8,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"os/signal"
@@ -110,7 +109,7 @@ func main() {
 		}
 	}
 
-	config, err := ioutil.ReadFile(*configfile)
+	config, err := os.ReadFile(*configfile)
 	if err != nil {
 		log.Printf("[error] reading config file: %s", err)
 		return
