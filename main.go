@@ -8,22 +8,21 @@ package main
 import (
 	"flag"
 	"fmt"
-	"log"
-	"os"
-	"os/signal"
-	"plugin"
-	"strings"
-
 	"github.com/bwNetFlow/flowpipeline/pipeline"
-	"github.com/hashicorp/logutils"
-
 	_ "github.com/bwNetFlow/flowpipeline/segments/alert/http"
-
 	_ "github.com/bwNetFlow/flowpipeline/segments/controlflow/branch"
-
 	_ "github.com/bwNetFlow/flowpipeline/segments/export/clickhouse"
 	_ "github.com/bwNetFlow/flowpipeline/segments/export/influx"
 	_ "github.com/bwNetFlow/flowpipeline/segments/export/prometheus"
+	"github.com/hashicorp/logutils"
+	"github.com/pkg/profile"
+	"log"
+	"os"
+	"os/signal"
+	"path"
+	"plugin"
+	"strings"
+	"time"
 
 	_ "github.com/bwNetFlow/flowpipeline/segments/filter/drop"
 	_ "github.com/bwNetFlow/flowpipeline/segments/filter/elephant"
@@ -84,11 +83,53 @@ func main() {
 	loglevel := flag.String("l", "warning", "loglevel: one of 'debug', 'info', 'warning' or 'error'")
 	version := flag.Bool("v", false, "print version")
 	configfile := flag.String("c", "config.yml", "location of the config file in yml format")
+	profilingType := flag.String("profiling", "", "enable profiling, one of 'cpu', 'mem', 'memheap', 'memallocs'")
+	profilingPath := flag.String("profiling-path", "", "path to write profiling data to")
+	profilingDuration := flag.Duration("profiling-duration", 60*time.Second, "duration of profiling")
 	flag.Parse()
 
 	if *version {
 		fmt.Println(Version)
 		return
+	}
+
+	if *profilingPath == "" {
+		*profilingPath = "."
+	}
+
+	switch *profilingType {
+	case "cpu":
+		go func() {
+			p := profile.Start(profile.CPUProfile, profile.ProfilePath(*profilingPath), profile.NoShutdownHook)
+			time.Sleep(*profilingDuration)
+			p.Stop()
+			log.Printf("[info] CPU profile written to %s", path.Join(*profilingPath, "cpu.pprof"))
+		}()
+	case "mem":
+		go func() {
+			p := profile.Start(profile.MemProfile, profile.ProfilePath(*profilingPath), profile.NoShutdownHook)
+			time.Sleep(*profilingDuration)
+			p.Stop()
+			log.Printf("[info] Memory profile written to %s", path.Join(*profilingPath, "mem.pprof"))
+		}()
+	case "memheap":
+		go func() {
+			p := profile.Start(profile.MemProfileHeap, profile.ProfilePath(*profilingPath), profile.NoShutdownHook)
+			time.Sleep(*profilingDuration)
+			p.Stop()
+			log.Printf("[info] MemProfileHeap profile written to %s", path.Join(*profilingPath, "mem.pprof"))
+		}()
+	case "memallocs":
+		go func() {
+			p := profile.Start(profile.MemProfileAllocs, profile.ProfilePath(*profilingPath), profile.NoShutdownHook)
+			time.Sleep(*profilingDuration)
+			p.Stop()
+			log.Printf("[info] MemProfileAllocs profile written to %s", path.Join(*profilingPath, "mem.pprof"))
+		}()
+	case "":
+		// do nothing
+	default:
+		log.Fatalf("[error] Unknown profiling type: %s", *profilingType)
 	}
 
 	log.SetOutput(&logutils.LevelFilter{
