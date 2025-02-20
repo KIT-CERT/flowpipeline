@@ -83,7 +83,13 @@ func NewResilientClient(serverName string, options ServerOptions, reconnectWait 
 func jsonEncoderWrapper(msg interface{}) ([]byte, error) {
 	protoMsg, ok := msg.(*pb.EnrichedFlow)
 	if ok {
-		return protojson.Marshal(protoMsg)
+		return protojson.Marshal(struct {
+			*pb.EnrichedFlow
+			TimeStamp uint64 `json:"@timestamp"`
+		}{
+			protoMsg,
+			protoMsg.TimeFlowStart,
+		})
 	} else {
 		return json.Marshal(msg)
 	}

@@ -28,7 +28,7 @@ type ServerOptions struct {
 	UseTLS            bool
 	VerifyCertificate bool
 	CompressionLevel  int
-	Parallism         int
+	Parallelism       int
 }
 
 type Lumberjack struct {
@@ -50,7 +50,7 @@ func DoDebugPrintf(format string, v ...any) {
 func (segment *Lumberjack) New(config map[string]string) segments.Segment {
 	var (
 		err                error
-		buflen             int
+		bufferLength       int
 		defaultCompression int
 	)
 
@@ -139,7 +139,7 @@ func (segment *Lumberjack) New(config map[string]string) segments.Segment {
 				UseTLS:            useTLS,
 				VerifyCertificate: verifyTLS,
 				CompressionLevel:  compressionLevel,
-				Parallism:         numRoutines,
+				Parallelism:       numRoutines,
 			}
 		}
 	}
@@ -206,18 +206,18 @@ func (segment *Lumberjack) New(config map[string]string) segments.Segment {
 
 	// create buffered channel
 	if config["queuesize"] != "" {
-		buflen, err = strconv.Atoi(strings.ReplaceAll(config["queuesize"], "_", ""))
+		bufferLength, err = strconv.Atoi(strings.ReplaceAll(config["queuesize"], "_", ""))
 		if err != nil {
 			log.Fatal().Err(err).Msg("Lumberjack: Failed to parse queuesize config option: ")
 		}
 	} else {
-		buflen = defaultQueueSize
+		bufferLength = defaultQueueSize
 	}
-	if buflen < 64 {
+	if bufferLength < 64 {
 		log.Error().Msgf("Lumberjack: queuesize too small, using default %d", defaultQueueSize)
-		buflen = defaultQueueSize
+		bufferLength = defaultQueueSize
 	}
-	segment.LumberjackOut = make(chan *pb.EnrichedFlow, buflen)
+	segment.LumberjackOut = make(chan *pb.EnrichedFlow, bufferLength)
 
 	return segment
 }
@@ -248,13 +248,13 @@ func (segment *Lumberjack) Run(wg *sync.WaitGroup) {
 	for server, options := range segment.Servers {
 		writerWG.Add(1)
 		options := options
-		for i := 0; i < options.Parallism; i++ {
+		for i := 0; i < options.Parallelism; i++ {
 			go func(server string, numServer int) {
 				defer writerWG.Done()
 				// connect to lumberjack server
 				client := NewResilientClient(server, options, segment.ReconnectWait)
 				defer client.Close()
-				log.Info().Msgf("Lumberjack: Connected to %s (TLS: %v, VerifyTLS: %v, Compression: %d, number %d/%d)", server, options.UseTLS, options.VerifyCertificate, options.CompressionLevel, numServer+1, options.Parallism)
+				log.Info().Msgf("Lumberjack: Connected to %s (TLS: %v, VerifyTLS: %v, Compression: %d, number %d/%d)", server, options.UseTLS, options.VerifyCertificate, options.CompressionLevel, numServer+1, options.Parallelism)
 
 				flowInterface := make([]interface{}, segment.BatchSize)
 				idx := 0
