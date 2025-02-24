@@ -1,6 +1,7 @@
 package lumberjack
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/netip"
 )
@@ -8,7 +9,8 @@ import (
 type IPAddress netip.Addr
 
 func (ip *IPAddress) MarshalJSON() ([]byte, error) {
-	return netip.Addr(*ip).MarshalBinary()
+	ipString := netip.Addr(*ip).String()
+	return json.Marshal(ipString)
 }
 
 func (ip *IPAddress) String() string {

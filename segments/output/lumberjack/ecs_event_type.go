@@ -93,7 +93,7 @@ type ECSEvent struct {
 	Created  int64              `json:"created,omitempty"`
 	Start    uint64             `json:"end,omitempty"`
 	End      uint64             `json:"end,omitempty"`
-	Duration uint64             `json:"duration,omitempty"`
+	Duration int64              `json:"duration,omitempty"`
 	Provider string             `json:"provider,omitempty"`
 	Module   string             `json:"module,omitempty"`
 }

@@ -72,7 +72,7 @@ func ECSFromEnrichedFlow(enrichedFlow *pb.EnrichedFlow) *ElasticCommonSchema {
 			Created:  time.Now().UnixMilli(),
 			Start:    enrichedFlow.GetTimeFlowStartMs(),
 			End:      enrichedFlow.GetTimeFlowEndMs(),
-			Duration: enrichedFlow.GetTimeFlowEndNs() - enrichedFlow.GetTimeFlowStartNs(),
+			Duration: int64(enrichedFlow.GetTimeFlowEndNs() - enrichedFlow.GetTimeFlowStartNs()),
 			Provider: ECSEventDefaultProvider,
 			Module:   ECSEventDefaultModule,
 		},
