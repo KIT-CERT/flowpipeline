@@ -282,7 +282,7 @@ func (segment *Lumberjack) Run(wg *sync.WaitGroup) {
 						}
 
 						// append flow to batch
-						flowInterface[idx] = flow
+						flowInterface[idx] = ECSFromEnrichedFlow(flow)
 						idx++
 
 						// send batch if full
