@@ -2,6 +2,7 @@ package lumberjack
 
 import (
 	"github.com/BelWue/flowpipeline/pb"
+	"golang.org/x/net/publicsuffix"
 	"net/netip"
 	"time"
 )
@@ -36,29 +37,101 @@ type ElasticCommonSchema struct {
 
 func ECSFromEnrichedFlow(enrichedFlow *pb.EnrichedFlow) *ElasticCommonSchema {
 	var (
-		srcIP               netip.Addr
-		SourceIP            *IPAddress
-		SourceIPString      string
-		dstIP               netip.Addr
-		DestinationIP       *IPAddress
-		DestinationIPString string
-		ok                  bool
+		ok                          bool
+		err                         error
+		SourceAS                    *AutonomousSystem = nil
+		DestinationAS               *AutonomousSystem = nil
+		srcIP                       netip.Addr
+		SourceIPString              string
+		SourceAddress               = ""
+		SourceMAC                   = ""
+		SourceDomain                = ""
+		SourceRegisteredDomain      = ""
+		SourceTopLevelDomain        = ""
+		dstIP                       netip.Addr
+		DestinationIPString         string
+		DestinationAddress          = ""
+		DestinationMAC              = ""
+		DestinationDomain           = ""
+		DestinationRegisteredDomain = ""
+		DestinationTopLevelDomain   = ""
+		RelatedHosts                = make([]string, 0, 2)
 	)
-	srcIP, ok = netip.AddrFromSlice(enrichedFlow.SrcAddr)
-	if ok {
-		SourceIP = (*IPAddress)(&srcIP)
-		SourceIPString = srcIP.String()
+	// source ip & address
+	if enrichedFlow.SourceIP != "" { // use IP string from addrstring segment if available
+		SourceIPString = enrichedFlow.SourceIP
+		SourceAddress = enrichedFlow.SourceIP
+		// TODO: set SourceIP
 	} else {
-		SourceIP = nil
-		SourceIPString = ""
+		// parse source address
+		srcIP, ok = netip.AddrFromSlice(enrichedFlow.SrcAddr)
+		if ok {
+			SourceIPString = srcIP.String()
+			SourceAddress = SourceIPString
+		}
 	}
-	dstIP, ok = netip.AddrFromSlice(enrichedFlow.DstAddr)
-	if ok {
-		DestinationIP = (*IPAddress)(&dstIP)
-		DestinationIPString = dstIP.String()
+	// use hostname from reversedns segment if available
+	/*	if enrichedFlow.SrcHostName != "" {
+		SourceDomain = enrichedFlow.SrcHostName
+		SourceRegisteredDomain, err = publicsuffix.EffectiveTLDPlusOne(enrichedFlow.SrcHostName[:len(enrichedFlow.SrcHostName)-2])
+		if err != nil {
+			SourceRegisteredDomain = ""
+		}
+		SourceTopLevelDomain, _ = publicsuffix.PublicSuffix(enrichedFlow.SrcHostName)
+		RelatedHosts = append(RelatedHosts, enrichedFlow.SrcHostName)
+	}*/
+	// add source MAC if set
+	if enrichedFlow.SrcMac != 0 {
+		if enrichedFlow.SourceMAC != "" {
+			SourceMAC = enrichedFlow.SourceMAC
+		} else {
+			SourceMAC = enrichedFlow.SrcMacString()
+		}
+	}
+
+	// destination ip & address
+	if enrichedFlow.DestinationIP != "" { // use IP string from addrstring segment if available
+		DestinationIPString = enrichedFlow.DestinationIP
+		DestinationAddress = enrichedFlow.DestinationIP
+		// TODO: set DestinationIP
 	} else {
-		DestinationIP = nil
-		DestinationIPString = ""
+		dstIP, ok = netip.AddrFromSlice(enrichedFlow.DstAddr)
+		if ok {
+			DestinationIPString = dstIP.String()
+			DestinationAddress = DestinationIPString
+		}
+	}
+	// use hostname from reversedns segment if available
+	/*	if enrichedFlow.DstHostName != "" {
+		DestinationDomain = enrichedFlow.DstHostName
+		DestinationRegisteredDomain, err = publicsuffix.EffectiveTLDPlusOne(enrichedFlow.DstHostName[:len(enrichedFlow.DstHostName)-2])
+		if err != nil {
+			DestinationRegisteredDomain = ""
+		}
+		DestinationTopLevelDomain, _ = publicsuffix.PublicSuffix(enrichedFlow.DstHostName)
+		RelatedHosts = append(RelatedHosts, enrichedFlow.DstHostName)
+	}*/
+	// add source MAC if set
+	if enrichedFlow.DstMac != 0 {
+		if enrichedFlow.DestinationMAC != "" {
+			DestinationMAC = enrichedFlow.DestinationMAC
+		} else {
+			DestinationMAC = enrichedFlow.DstMacString()
+		}
+	}
+
+	// AS
+	srcAS := enrichedFlow.GetSrcAs()
+	if srcAS != 0 {
+		SourceAS = &AutonomousSystem{
+			Number: srcAS,
+		}
+	}
+	dstAS := enrichedFlow.GetDstAs()
+	if dstAS != 0 {
+		DestinationAS = &AutonomousSystem{
+			Number: dstAS,
+		}
 	}
 
 	result := &ElasticCommonSchema{
@@ -77,30 +150,34 @@ func ECSFromEnrichedFlow(enrichedFlow *pb.EnrichedFlow) *ElasticCommonSchema {
 			Module:   ECSEventDefaultModule,
 		},
 		Source: &ECSSourceOrDest{
-			Address: SourceIPString, // TODO: use DNS name if known
-			Bytes:   enrichedFlow.GetBytes(),
-			IP:      SourceIP,
-			MAC:     enrichedFlow.SrcMacString(),
-			Packets: enrichedFlow.GetPackets(),
-			Port:    enrichedFlow.GetSrcPort(),
-			AutonomousSystem: &AutonomousSystem{
-				Number: enrichedFlow.GetSrcAs(),
-			},
+			Address:          SourceAddress,
+			Bytes:            enrichedFlow.GetBytes(),
+			IP:               SourceIPString,
+			MAC:              SourceMAC,
+			Packets:          enrichedFlow.GetPackets(),
+			Port:             enrichedFlow.GetSrcPort(),
+			Domain:           SourceDomain,
+			RegisteredDomain: SourceRegisteredDomain,
+			//Subdomain:        SourceSubdomain,
+			TopLevelDomain:   SourceTopLevelDomain,
+			AutonomousSystem: SourceAS,
 		},
 		Destination: &ECSSourceOrDest{
-			Address: DestinationIPString, // TODO: use DNS name if known
-			Bytes:   0,                   // flows are uni-directional
-			IP:      DestinationIP,
-			MAC:     enrichedFlow.DstMacString(),
-			Packets: 0, // flows are uni-directional
-			Port:    enrichedFlow.GetDstPort(),
-			AutonomousSystem: &AutonomousSystem{
-				Number: enrichedFlow.GetDstAs(),
-			},
+			Address:          DestinationAddress,
+			Bytes:            0, // flows are uni-directional
+			IP:               DestinationIPString,
+			MAC:              DestinationMAC,
+			Packets:          0, // flows are uni-directional
+			Port:             enrichedFlow.GetDstPort(),
+			Domain:           DestinationDomain,
+			RegisteredDomain: DestinationRegisteredDomain,
+			//Subdomain:        DestinationSubdomain,
+			TopLevelDomain:   DestinationTopLevelDomain,
+			AutonomousSystem: DestinationAS,
 		},
 		Related: &ECSRelated{
 			Hash:  nil,
-			Hosts: nil,
+			Hosts: RelatedHosts,
 			IP:    []string{SourceIPString, DestinationIPString},
 			User:  nil,
 		},
