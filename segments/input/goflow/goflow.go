@@ -100,8 +100,9 @@ func (segment Goflow) New(config map[string]string) segments.Segment {
 	}
 
 	return &Goflow{
-		Listen:  listenAddressesSlice,
-		Workers: workers,
+		Listen:                 listenAddressesSlice,
+		Workers:                workers,
+		PrometheusStatsAddress: config["prometheus_stats_address"],
 	}
 }
 
