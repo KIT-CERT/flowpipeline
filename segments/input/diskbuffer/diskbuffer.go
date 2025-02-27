@@ -61,6 +61,11 @@ func (segment *DiskBuffer) New(config map[string]string) segments.Segment {
 
 	segment.BufferDir = config["bufferdir"]
 	if segment.BufferDir != "" {
+		// opportunistically try to create the buffer directory
+		err = os.MkdirAll(segment.BufferDir, 0x700)
+		if err != nil {
+			log.Fatalf("Error creating buffer dir: %v", err)
+		}
 		fi, err := os.Stat(segment.BufferDir)
 		if err != nil {
 			log.Fatal().Msgf("Diskbuffer: Could not obtain file info for file %s", segment.BufferDir)
@@ -279,7 +284,7 @@ func WriteToDisk(segment *DiskBuffer, ReadWriteWG *sync.WaitGroup, Signal chan s
 						continue
 					}
 				default:
-					// MemoryBuffer is empty -> no need to write anyhing to disk
+					// MemoryBuffer is empty -> no need to write anything to disk
 					return
 				}
 			}
