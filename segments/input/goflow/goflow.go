@@ -99,9 +99,26 @@ func (segment Goflow) New(config map[string]string) segments.Segment {
 		log.Println("[info] Goflow: 'workers' set to default '1'.")
 	}
 
+	var queueSize = 1000000
+	if config["queuesize"] != "" {
+		if parsedQueueSize, err := strconv.ParseInt(config["queuesize"], 10, 32); err == nil {
+			queueSize = int(parsedQueueSize)
+			if queueSize <= 0 {
+				log.Println("[error] Goflow: Queue size has to be a positive number.")
+				return nil
+			}
+		} else {
+			log.Println("[error] Goflow: Failed to parse 'queuesize' parameter.")
+			return nil
+		}
+	} else {
+		log.Println("[info] Goflow: 'queuesize' set to default '1000000' (one million).")
+	}
+
 	return &Goflow{
 		Listen:                 listenAddressesSlice,
 		Workers:                workers,
+		QueueSize:              queueSize,
 		PrometheusStatsAddress: config["prometheus_stats_address"],
 	}
 }
