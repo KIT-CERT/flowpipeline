@@ -64,7 +64,7 @@ func (segment *DiskBuffer) New(config map[string]string) segments.Segment {
 		// opportunistically try to create the buffer directory
 		err = os.MkdirAll(segment.BufferDir, 0x700)
 		if err != nil {
-			log.Fatalf("Error creating buffer dir: %v", err)
+			log.Fatal().Err(err).Msg("Error creating buffer dir: ")
 		}
 		fi, err := os.Stat(segment.BufferDir)
 		if err != nil {
