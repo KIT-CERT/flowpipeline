@@ -177,8 +177,9 @@ func (rcb *ReceiverCallback) Dropped(pkt utils.Message) {
 	oneSecond := time.Duration(1) * time.Second
 	if rcb.CurrentTimer == nil {
 		rcb.CurrentTimer = time.AfterFunc(oneSecond, func() {
-			log.Printf("[warn] Dropped %d packets in the last seconds.", rcb.DroppedPackets)
+			log.Printf("[warn] Dropped %d packets in the last second.", rcb.DroppedPackets)
 			rcb.CurrentTimer = nil
+			rcb.DroppedPackets = 0
 		})
 	}
 }
