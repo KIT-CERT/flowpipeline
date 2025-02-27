@@ -2,7 +2,7 @@ package lumberjack
 
 import (
 	"github.com/BelWue/flowpipeline/pb"
-	"golang.org/x/net/publicsuffix"
+	//"golang.org/x/net/publicsuffix"
 	"net/netip"
 	"time"
 )
@@ -38,7 +38,6 @@ type ElasticCommonSchema struct {
 func ECSFromEnrichedFlow(enrichedFlow *pb.EnrichedFlow) *ElasticCommonSchema {
 	var (
 		ok                          bool
-		err                         error
 		SourceAS                    *AutonomousSystem = nil
 		DestinationAS               *AutonomousSystem = nil
 		srcIP                       netip.Addr
