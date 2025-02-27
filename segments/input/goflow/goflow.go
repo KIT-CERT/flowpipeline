@@ -35,12 +35,16 @@ import (
 	protoproducer "github.com/netsampler/goflow2/v2/producer/proto"
 )
 
+const (
+	defaultQueueLength = 1_000_000
+)
+
 type Goflow struct {
 	segments.BaseSegment
 	Listen     []url.URL // optional, default config value for this slice is "sflow://:6343,netflow://:2055"
 	Workers    uint64    // optional, amunt of workers to spawn for each endpoint, default is 1
 	Blocking   bool      //optional, default is false
-	QueueSize  int       //default is 1000000
+	QueueSize  int       //default see variable defaultQueueLength
 	NumSockets int       //default is 1
 	goflow_in  chan *pb.EnrichedFlow
 }
@@ -76,7 +80,7 @@ func (segment Goflow) New(config map[string]string) segments.Segment {
 
 		listenAddressesSlice = append(listenAddressesSlice, *listenAddrUrl)
 	}
-	log.Info().Msgf("Goflow: Configured for for %s", listen)
+	log.Info().Msgf("Goflow: Configured for %s", listen)
 
 	var workers uint64 = 1
 	if config["workers"] != "" {
@@ -93,9 +97,26 @@ func (segment Goflow) New(config map[string]string) segments.Segment {
 		log.Info().Msg("Goflow: 'workers' set to default '1'.")
 	}
 
+	var queueSize = defaultQueueLength
+	if config["queuesize"] != "" {
+		if parsedQueueSize, err := strconv.ParseInt(config["queuesize"], 10, 32); err == nil {
+			queueSize = int(parsedQueueSize)
+			if queueSize <= 0 {
+				log.Error().Msg("Goflow: Queue size has to be a positive number.")
+				return nil
+			}
+		} else {
+			log.Error().Msg("Goflow: Failed to parse 'queuesize' parameter.")
+			return nil
+		}
+	} else {
+		log.Info().Msgf("Goflow: 'queuesize' set to default '%d' (one million).", defaultQueueLength)
+	}
+
 	return &Goflow{
-		Listen:  listenAddressesSlice,
-		Workers: workers,
+		Listen:    listenAddressesSlice,
+		Workers:   workers,
+		QueueSize: queueSize,
 	}
 }
 
@@ -172,7 +193,7 @@ func (segment *Goflow) startGoFlow(transport transport.TransportInterface) {
 			}
 
 			if segment.QueueSize == 0 {
-				segment.QueueSize = 1000000
+				segment.QueueSize = defaultQueueLength
 			}
 
 			cfg := &utils.UDPReceiverConfig{
