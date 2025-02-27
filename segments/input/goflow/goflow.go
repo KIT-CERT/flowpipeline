@@ -7,13 +7,18 @@ package goflow
 import (
 	"bytes"
 	"context"
+	"errors"
+	"fmt"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"log"
 	"log/slog"
+	"net/http"
 	"net/url"
 	"os"
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/BelWue/flowpipeline/pb"
 	"github.com/BelWue/flowpipeline/segments"
@@ -37,12 +42,14 @@ import (
 
 type Goflow struct {
 	segments.BaseSegment
-	Listen     []url.URL // optional, default config value for this slice is "sflow://:6343,netflow://:2055"
-	Workers    uint64    // optional, amount of workers to spawn for each endpoint, default is 1
-	Blocking   bool      //optional, default is false
-	QueueSize  int       //default is 1000000
-	NumSockets int       //default is 1
-	goflow_in  chan *pb.EnrichedFlow
+	Listen                 []url.URL // optional, default config value for this slice is "sflow://:6343,netflow://:2055"
+	Workers                uint64    // optional, amount of workers to spawn for each endpoint, default is 1
+	Blocking               bool      //optional, default is false
+	QueueSize              int       //default is 1000000
+	NumSockets             int       //default is 1
+	PrometheusStatsAddress string    // optional, if set to a valid URL, goflow2 prometheus stats will be served here
+
+	goflow_in chan *pb.EnrichedFlow
 }
 
 func (segment Goflow) New(config map[string]string) segments.Segment {
@@ -146,6 +153,49 @@ func (d *channelDriver) Close(context.Context) error {
 	return nil
 }
 
+type myProtobufDriver struct {
+}
+
+func (d *myProtobufDriver) Format(data interface{}) ([]byte, []byte, error) {
+	msg, ok := data.(proto.Message)
+	if !ok {
+		return nil, nil, fmt.Errorf("message is not protobuf")
+	}
+	// TODO: can we shave of this Marshal here and the Unmarshal in line 116
+	b, err := proto.Marshal(msg)
+	return nil, b, err
+}
+
+type ReceiverCallback struct {
+	ReceiverMetric *metrics.ReceiverMetric
+	DroppedPackets uint64
+	CurrentTimer   *time.Timer
+}
+
+func NewReceiverCallback(prometheusEnabled bool) *ReceiverCallback {
+	var receiverMetric *metrics.ReceiverMetric = nil
+	if prometheusEnabled {
+		receiverMetric = metrics.NewReceiverMetric()
+	}
+
+	return &ReceiverCallback{ReceiverMetric: receiverMetric}
+}
+
+func (rcb *ReceiverCallback) Dropped(pkt utils.Message) {
+	rcb.DroppedPackets++
+	if rcb.ReceiverMetric != nil {
+		rcb.ReceiverMetric.Dropped(pkt)
+	}
+
+	oneSecond := time.Duration(1) * time.Second
+	if rcb.CurrentTimer != nil {
+		rcb.CurrentTimer = time.AfterFunc(oneSecond, func() {
+			log.Printf("[warn] Dropped %d packets in the last seconds.", rcb.DroppedPackets)
+			rcb.CurrentTimer = nil
+		})
+	}
+}
+
 func (segment *Goflow) startGoFlow(transport transport.TransportInterface) {
 	formatter, err := format.FindFormat("bin")
 	if err != nil {
@@ -174,8 +224,9 @@ func (segment *Goflow) startGoFlow(transport transport.TransportInterface) {
 				Workers:          int(segment.Workers),
 				QueueSize:        segment.QueueSize,
 				Blocking:         segment.Blocking,
-				ReceiverCallback: metrics.NewReceiverMetric(),
+				ReceiverCallback: NewReceiverCallback(segment.PrometheusStatsAddress != ""),
 			}
+
 			recv, err := utils.NewUDPReceiver(cfg)
 			if err != nil {
 				log.Println("error creating UDP receiver", slog.String("error", err.Error()))
@@ -234,6 +285,18 @@ func (segment *Goflow) startGoFlow(transport transport.TransportInterface) {
 			}
 
 		}(listenAddrUrl)
+	}
+
+	// Start prometheus server if requested
+	if segment.PrometheusStatsAddress != "" {
+		http.Handle("/metrics", promhttp.Handler())
+		srv := http.Server{Addr: segment.PrometheusStatsAddress}
+		go func() {
+			err := srv.ListenAndServe()
+			if err != nil && !errors.Is(err, http.ErrServerClosed) {
+				log.Fatalf("[critical] Failed to start goflow2 prometheus server: %s", err.Error())
+			}
+		}()
 	}
 }
 
