@@ -235,6 +235,10 @@ func (segment *Goflow) startGoFlow(transport transport.TransportInterface) {
 				slog.Error("error producer", slog.String("error", err.Error()))
 				os.Exit(1)
 			}
+			// enable Prometheus stats
+			if segment.PrometheusStatsAddress != "" {
+				flowProducer = metrics.WrapPromProducer(flowProducer)
+			}
 
 			cfgPipe := &utils.PipeConfig{
 				Format:           formatter,
