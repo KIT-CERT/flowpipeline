@@ -154,18 +154,22 @@ func (d *channelDriver) Close(context.Context) error {
 }
 
 type ReceiverCallback struct {
+	Name           string
 	ReceiverMetric *metrics.ReceiverMetric
 	DroppedPackets uint64
 	CurrentTimer   *time.Timer
 }
 
-func NewReceiverCallback(prometheusEnabled bool) *ReceiverCallback {
+func NewReceiverCallback(name string, prometheusEnabled bool) *ReceiverCallback {
 	var receiverMetric *metrics.ReceiverMetric = nil
 	if prometheusEnabled {
 		receiverMetric = metrics.NewReceiverMetric()
 	}
 
-	return &ReceiverCallback{ReceiverMetric: receiverMetric}
+	return &ReceiverCallback{
+		Name:           name,
+		ReceiverMetric: receiverMetric,
+	}
 }
 
 func (rcb *ReceiverCallback) Dropped(pkt utils.Message) {
@@ -177,7 +181,7 @@ func (rcb *ReceiverCallback) Dropped(pkt utils.Message) {
 	oneSecond := time.Duration(1) * time.Second
 	if rcb.CurrentTimer == nil {
 		rcb.CurrentTimer = time.AfterFunc(oneSecond, func() {
-			log.Printf("[warn] Dropped %d packets in the last second.", rcb.DroppedPackets)
+			log.Printf("[warn] Goflow listener %s dropped %d packets in the last second.", rcb.Name, rcb.DroppedPackets)
 			rcb.CurrentTimer = nil
 			rcb.DroppedPackets = 0
 		})
@@ -212,7 +216,7 @@ func (segment *Goflow) startGoFlow(transport transport.TransportInterface) {
 				Workers:          int(segment.Workers),
 				QueueSize:        segment.QueueSize,
 				Blocking:         segment.Blocking,
-				ReceiverCallback: NewReceiverCallback(segment.PrometheusStatsAddress != ""),
+				ReceiverCallback: NewReceiverCallback(listenAddrUrl.String(), segment.PrometheusStatsAddress != ""),
 			}
 
 			recv, err := utils.NewUDPReceiver(cfg)
