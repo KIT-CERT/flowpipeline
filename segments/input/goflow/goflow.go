@@ -1,14 +1,13 @@
 // Captures Netflow v9 and feeds flows to the following segments. Currently,
 // this segment only uses a limited subset of goflow2 functionality.
-// If no configuration option is provided a sflow and a netflow collector will be started.
-// netflowLagcy is also built in but currently not tested.
+// If no configuration option is provided, an sflow and a netflow collector will be started.
+// netflowLegacy is also built in but currently not tested.
 package goflow
 
 import (
 	"bytes"
 	"context"
 	"errors"
-	"fmt"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"log"
 	"log/slog"
@@ -151,19 +150,6 @@ func (d *channelDriver) Send(key, data []byte) error {
 func (d *channelDriver) Close(context.Context) error {
 	close(d.out)
 	return nil
-}
-
-type myProtobufDriver struct {
-}
-
-func (d *myProtobufDriver) Format(data interface{}) ([]byte, []byte, error) {
-	msg, ok := data.(proto.Message)
-	if !ok {
-		return nil, nil, fmt.Errorf("message is not protobuf")
-	}
-	// TODO: can we shave of this Marshal here and the Unmarshal in line 116
-	b, err := proto.Marshal(msg)
-	return nil, b, err
 }
 
 type ReceiverCallback struct {
