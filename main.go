@@ -47,6 +47,7 @@ import (
 	_ "github.com/BelWue/flowpipeline/segments/modify/normalize"
 	_ "github.com/BelWue/flowpipeline/segments/modify/protomap"
 	_ "github.com/BelWue/flowpipeline/segments/modify/remoteaddress"
+	_ "github.com/BelWue/flowpipeline/segments/modify/resolveips"
 	_ "github.com/BelWue/flowpipeline/segments/modify/reversedns"
 	_ "github.com/BelWue/flowpipeline/segments/modify/snmp"
 
