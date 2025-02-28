@@ -39,6 +39,10 @@ import (
 	protoproducer "github.com/netsampler/goflow2/v2/producer/proto"
 )
 
+const (
+	defaultQueueLength = 1_000_000
+)
+
 type Goflow struct {
 	segments.BaseSegment
 	Listen                 []url.URL // optional, default config value for this slice is "sflow://:6343,netflow://:2055"
@@ -225,7 +229,7 @@ func (segment *Goflow) startGoFlow(transport transport.TransportInterface) {
 			}
 
 			if segment.QueueSize == 0 {
-				segment.QueueSize = 1000000
+				segment.QueueSize = defaultQueueLength
 			}
 
 			cfg := &utils.UDPReceiverConfig{
