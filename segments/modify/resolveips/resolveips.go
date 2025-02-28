@@ -13,7 +13,7 @@ import (
 
 const (
 	DefaultQueueLength          = 2_000_000 // 65536
-	DefaultDNSResolutionTimeout = 1 * time.Second
+	DefaultDNSResolutionTimeout = 2 * time.Second
 )
 
 // ResolveIPs is a segment that resolves IP addresses to hostnames.
@@ -33,7 +33,7 @@ func (segment *ResolveIPs) New(config map[string]string) segments.Segment {
 		if queuelen, err := strconv.ParseUint(queueLength, 10, 32); err == nil {
 			NewSegment.ResolveQueue = make(chan *futureResolver, queuelen)
 		} else {
-			log.Printf("[error] ResolveIPs: Invalid 'queuelength' parameter %s, using default of %u\n", queueLength, DefaultQueueLength)
+			log.Printf("[error] ResolveIPs: Invalid 'queuelength' parameter %s, using default of %d\n", queueLength, DefaultQueueLength)
 			NewSegment.ResolveQueue = make(chan *futureResolver, DefaultQueueLength)
 		}
 	}
@@ -76,54 +76,46 @@ func NewFutureResolver(flow *pb.EnrichedFlow) *futureResolver {
 	}
 	go func(flow *pb.EnrichedFlow, fr *futureResolver) {
 		var (
-			result []string
-			err    error
+			wg sync.WaitGroup
 		)
-		// Source IP (with support for addrstrings segment)
 		ctx, cancel := context.WithTimeout(context.Background(), DefaultDNSResolutionTimeout)
 		defer cancel()
-		if flow.SourceIP != "" {
-			result, err = net.DefaultResolver.LookupAddr(ctx, flow.SourceIP)
-		} else {
-			result, err = net.DefaultResolver.LookupAddr(ctx, flow.SrcAddrObj().String())
-		}
-		if err == nil {
-			flow.SrcHostName = result[0]
-		}
-		// Destination IP (with support for addrstrings segment)
-		ctx, cancel = context.WithTimeout(context.Background(), DefaultDNSResolutionTimeout)
-		defer cancel()
-		if flow.DestinationIP != "" {
-			result, err = net.DefaultResolver.LookupAddr(ctx, flow.DestinationIP)
-		} else {
-			result, err = net.DefaultResolver.LookupAddr(ctx, flow.DstAddrObj().String())
-		}
-		if err == nil {
-			flow.DstHostName = result[0]
-		}
-		// Next Hop IP (with support for addrstrings segment)
-		ctx, cancel = context.WithTimeout(context.Background(), DefaultDNSResolutionTimeout)
-		defer cancel()
-		if flow.NextHopIP != "" {
-			result, err = net.DefaultResolver.LookupAddr(ctx, flow.NextHopIP)
-		} else {
-			result, err = net.DefaultResolver.LookupAddr(ctx, flow.NextHopObj().String())
-		}
-		if err == nil {
-			flow.NextHopHostName = result[0]
-		}
-		// Sampler Address IP (with support for addrstrings segment)
-		ctx, cancel = context.WithTimeout(context.Background(), DefaultDNSResolutionTimeout)
-		defer cancel()
-		if flow.SamplerIP != "" {
-			result, err = net.DefaultResolver.LookupAddr(ctx, flow.SamplerIP)
-		} else {
-			result, err = net.DefaultResolver.LookupAddr(ctx, flow.SamplerAddressObj().String())
-		}
-		if err == nil {
-			flow.SamplerHostName = result[0]
+
+		resolveHostName := func(ip string, getAddrObjFunc func() string, assignHostNameFunc func(string)) {
+			defer wg.Done()
+			var (
+				result []string
+				err    error
+			)
+			if ip != "" {
+				result, err = net.DefaultResolver.LookupAddr(ctx, ip)
+			} else {
+				result, err = net.DefaultResolver.LookupAddr(ctx, getAddrObjFunc())
+			}
+			if err == nil && len(result) > 0 {
+				assignHostNameFunc(result[0])
+			}
 		}
 
+		wg.Add(4)
+		// Source IP (with support for addrstrings segment)
+		go resolveHostName(flow.SourceIP, flow.SrcAddrObj().String, func(hostName string) {
+			flow.SrcHostName = hostName
+		})
+		// Destination IP (with support for addrstrings segment)
+		go resolveHostName(flow.DestinationIP, flow.DstAddrObj().String, func(hostName string) {
+			flow.DstHostName = hostName
+		})
+		// Next Hop IP (with support for addrstrings segment)
+		go resolveHostName(flow.NextHopIP, flow.NextHopObj().String, func(hostName string) {
+			flow.NextHopHostName = hostName
+		})
+		// Sampler Address IP (with support for addrstrings segment)
+		go resolveHostName(flow.SamplerIP, flow.SamplerAddressObj().String, func(hostName string) {
+			flow.SamplerHostName = hostName
+		})
+
+		wg.Wait()
 		fr.result <- flow
 
 	}(flow, &fr)
