@@ -486,16 +486,23 @@ beginning of this project).
 This flow collector needs to receive input from any IPFIX/Netflow/sFlow
 exporters, for instance your network devices.
 
+You can specify a `queuesize`
+(the number of flow packages that should be queued by the segment before more input is ignored)
+and a number of workers (how many parallel goflow2 routines should be running).
+Mind that the queue is shared between all workers.
+If the number of workers is too low, the queue will fill up and eventually you will lose flows (this will be logged).
+
 ```yaml
 - segment: goflow
   # the lines below are optional and set to default
   config:
     listen: "sflow://:6343,netflow://:2055"
+    queuesize: 1000000
     workers: 1
 ```
 
-[goflow2 fields](https://github.com/netsampler/goflow2/blob/main/docs/protocols.md)
-[godoc](https://pkg.go.dev/github.com/BelWue/flowpipeline/segments/input/goflow)
+[goflow2 fields](https://github.com/netsampler/goflow2/blob/main/docs/protocols.md)  
+[godoc](https://pkg.go.dev/github.com/BelWue/flowpipeline/segments/input/goflow)  
 [examples using this segment](https://github.com/search?q=%22segment%3A+goflow%22+extension%3Ayml+repo%3AbwNetFlow%2Fflowpipeline%2Fexamples&type=Code)
 
 #### kafkaconsumer
