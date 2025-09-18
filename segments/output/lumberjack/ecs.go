@@ -2,6 +2,8 @@ package lumberjack
 
 import (
 	"github.com/BelWue/flowpipeline/pb"
+	"github.com/BelWue/flowpipeline/utils"
+
 	//"golang.org/x/net/publicsuffix"
 	"net/netip"
 	"time"
@@ -31,8 +33,28 @@ type ElasticCommonSchema struct {
 	Source      *ECSSourceOrDest `json:"source,omitempty"`
 	Destination *ECSSourceOrDest `json:"destination,omitempty"`
 
+	// Network (https://www.elastic.co/docs/reference/ecs/ecs-network)
+	Network *ECSNetwork `json:"network,omitempty"`
+
+	// needed for community ID enrichment in Elastic
+	ICMP *ECSRelatedICMP `json:"icmp,omitempty"`
+
 	// Related Fields (https://www.elastic.co/guide/en/ecs/current/ecs-related.html)
 	Related *ECSRelated `json:"related,omitempty"`
+}
+
+type ECSNetwork struct {
+	IanaNumber uint32 `json:"iana_number,omitempty"`
+	Transport  string `json:"transport,omitempty"`
+	Bytes      uint64 `json:"bytes"`
+	Packets    uint64 `json:"packets"`
+	Type       string `json:"type,omitempty"`
+}
+
+// needed for https://www.elastic.co/docs/reference/enrich-processor/community-id-processor
+type ECSRelatedICMP struct {
+	Type uint32 `json:"type,omitempty"`
+	Code uint32 `json:"code,omitempty"`
 }
 
 func ECSFromEnrichedFlow(enrichedFlow *pb.EnrichedFlow) *ElasticCommonSchema {
@@ -133,6 +155,23 @@ func ECSFromEnrichedFlow(enrichedFlow *pb.EnrichedFlow) *ElasticCommonSchema {
 		}
 	}
 
+	var icmp *ECSRelatedICMP = nil
+	// only set if proto is ICMPv4 or ICMPv6
+	if enrichedFlow.Proto == 1 || enrichedFlow.Proto == 58 {
+		icmp = &ECSRelatedICMP{
+			Type: enrichedFlow.IcmpType,
+			Code: enrichedFlow.IcmpCode,
+		}
+	}
+
+	var networkType string
+	switch enrichedFlow.Etype {
+	case 2048:
+		networkType = "ipv4"
+	case 34525:
+		networkType = "ipv6"
+	}
+
 	result := &ElasticCommonSchema{
 		Timestamp: enrichedFlow.GetTimeFlowStartMs(),
 		ECS:       &ECSECS{Version: ElasticCommonSchemaVersion},
@@ -173,6 +212,14 @@ func ECSFromEnrichedFlow(enrichedFlow *pb.EnrichedFlow) *ElasticCommonSchema {
 			//Subdomain:        DestinationSubdomain,
 			TopLevelDomain:   DestinationTopLevelDomain,
 			AutonomousSystem: DestinationAS,
+		},
+		ICMP: icmp,
+		Network: &ECSNetwork{
+			IanaNumber: enrichedFlow.Proto,
+			Transport:  utils.IanaProtocolNumberToLowercaseName(enrichedFlow.Proto),
+			Bytes:      enrichedFlow.GetBytes(),
+			Packets:    enrichedFlow.GetPackets(),
+			Type:       networkType,
 		},
 		Related: &ECSRelated{
 			Hash:  nil,
