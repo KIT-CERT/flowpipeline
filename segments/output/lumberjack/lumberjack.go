@@ -2,7 +2,7 @@
 // servers user the [lumberjack](https://github.com/logstash-plugins/logstash-input-beats/blob/main/PROTOCOL.md)
 // protocol. Flows are queued in a non-deterministic, round-robin fashion to the servers.
 //
-// The only mandatory option is `servers` which contains a comma separated list of lumberjack
+// The only mandatory option is `servers` which contains a comma-separated list of lumberjack
 // server URLs. Each URL must start with one of these schemata: `tcp://` (plain TCP,
 // no encryption), `tls://` (TLS encryption) or `tlsnoverify://` (TLS encryption without
 // certificate verification). The schema is followed by the hostname or IP address, a colon `:`,
@@ -10,7 +10,7 @@
 //
 // A goroutine is spawned for every lumberjack server. Each goroutine only uses one CPU core to
 // process and send flows. This may not be enough when the ingress flow rate is high and/or a high compression
-// level is used. The number of goroutines per backend can be set explicitly with the `?count=x` URL
+// level is used. The number of goroutines per backend can by set explicitly with the `?count=x` URL
 // parameter. For example:
 //
 // ```yaml
@@ -44,7 +44,7 @@
 //
 // These options help to observe the performance characteristics of the segment:
 //
-// * `batchdebug` (bool) enables debug logging of batch operations (full send, partial send and skipped send).
+// * `batchdebug` (bool) enables debug logging of batch operations (full send, partial send, and skipped send).
 // * `queuestatusinterval` (duration) sets the interval at which the segment logs the current queue status.
 //
 // To see debug output, set the `-l debug` flag when starting `flowpipeline`.
