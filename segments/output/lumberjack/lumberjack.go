@@ -110,7 +110,7 @@ type Lumberjack struct {
 	LumberjackOut       chan *pb.EnrichedFlow
 }
 
-func NoDebugPrintf(format string, v ...any) {}
+func NoDebugPrintf(format string, v ...any) { _, _ = format, v }
 func DoDebugPrintf(format string, v ...any) {
 	log.Debug().Msgf(format, v...)
 }
@@ -246,7 +246,7 @@ func (segment *Lumberjack) New(config map[string]string) segments.Segment {
 		if err != nil {
 			log.Fatal().Err(err).Msg("Lumberjack: Failed to parse batchdebug config option: ")
 		}
-		// set proper BatchDebugPrintf function
+		// set the correct BatchDebugPrintf function
 		if batchDebug {
 			segment.BatchDebugPrintf = DoDebugPrintf
 		} else {
@@ -312,7 +312,7 @@ func (segment *Lumberjack) Run(wg *sync.WaitGroup) {
 		}()
 	}
 
-	// run goroutine for each lumberjack server
+	// run a goroutine for each lumberjack server
 	for server, options := range segment.Servers {
 		writerWG.Add(1)
 		options := options
@@ -336,7 +336,7 @@ func (segment *Lumberjack) Run(wg *sync.WaitGroup) {
 				for {
 					select {
 					case flow, isOpen := <-segment.LumberjackOut:
-						// exit on closed channel
+						// exit on channel closing
 						if !isOpen {
 							// send local buffer
 							count, err := client.SendNoRetry(flowInterface[:idx])
@@ -355,8 +355,8 @@ func (segment *Lumberjack) Run(wg *sync.WaitGroup) {
 
 						// send batch if full
 						if idx == segment.BatchSize {
-							// We got an event, and timer was already set.
-							// We need to stop the timer and drain the channel if needed,
+							// We got an event, and the timer was already set.
+							// We need to stop the timer and drain the channel
 							// so that we can safely reset it later.
 							if timerSet {
 								if !timer.Stop() {
@@ -371,7 +371,7 @@ func (segment *Lumberjack) Run(wg *sync.WaitGroup) {
 							// reset idx
 							idx = 0
 
-							// If timer was not set, or it was stopped before, it's safe to reset it.
+							// If the timer was not set, or it was stopped before, it's safe to reset it.
 							if !timerSet {
 								timerSet = true
 								timer.Reset(segment.BatchTimeout)
