@@ -106,7 +106,7 @@ func ECSFromEnrichedFlow(enrichedFlow *pb.EnrichedFlow) *ElasticCommonSchema {
 		if enrichedFlow.SourceMAC != "" {
 			SourceMAC = enrichedFlow.SourceMAC
 		} else {
-			SourceMAC = enrichedFlow.SrcMacString()
+			SourceMAC = enrichedFlow.SrcMacString(pb.MACSeparatorDash)
 		}
 	}
 
@@ -137,7 +137,7 @@ func ECSFromEnrichedFlow(enrichedFlow *pb.EnrichedFlow) *ElasticCommonSchema {
 		if enrichedFlow.DestinationMAC != "" {
 			DestinationMAC = enrichedFlow.DestinationMAC
 		} else {
-			DestinationMAC = enrichedFlow.DstMacString()
+			DestinationMAC = enrichedFlow.DstMacString(pb.MACSeparatorDash)
 		}
 	}
 

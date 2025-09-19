@@ -10,7 +10,7 @@
 //
 // A goroutine is spawned for every lumberjack server. Each goroutine only uses one CPU core to
 // process and send flows. This may not be enough when the ingress flow rate is high and/or a high compression
-// level is used. The number of goroutines per backend can by set explicitly with the `?count=x` URL
+// level is used. The number of goroutines per backend can be set explicitly with the `?count=x` URL
 // parameter. For example:
 //
 // ```yaml
@@ -186,7 +186,7 @@ func (segment *Lumberjack) New(config map[string]string) segments.Segment {
 			}
 
 			// parse count url argument
-			var numRoutines = 1
+			var numRoutines int
 			numRoutinesString := urlQueryParams.Get("count")
 			if numRoutinesString == "" {
 				numRoutines = 1
@@ -320,7 +320,7 @@ func (segment *Lumberjack) Run(wg *sync.WaitGroup) {
 			go func(server string, numServer int) {
 				defer writerWG.Done()
 				// connect to lumberjack server
-				client := NewResilientClient(server, options, segment.ReconnectWait)
+				client := newResilientClient(server, options, segment.ReconnectWait)
 				defer client.Close()
 				log.Info().Msgf("Lumberjack: Connected to %s (TLS: %v, VerifyTLS: %v, Compression: %d, number %d/%d)", server, options.UseTLS, options.VerifyCertificate, options.CompressionLevel, numServer+1, options.Parallelism)
 

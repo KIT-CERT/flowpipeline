@@ -74,9 +74,9 @@ type ECSEventOutcome string
 
 const (
 	ECSEventOutcomeUNSET   ECSEventOutcome = ""        //
-	ECSEventOutcomeFailure                 = "failure" // failure
-	ECSEventOutcomeSuccess                 = "success" // success
-	ECSEventOutcomeUnknown                 = "unknown" // unknown
+	ECSEventOutcomeFailure ECSEventOutcome = "failure" // failure
+	ECSEventOutcomeSuccess ECSEventOutcome = "success" // success
+	ECSEventOutcomeUnknown ECSEventOutcome = "unknown" // unknown
 )
 
 type ElasticTimeStamp time.Time
@@ -91,7 +91,7 @@ type ECSEvent struct {
 	Type     []ECSEventType     `json:"type,omitempty"`
 	Outcome  ECSEventOutcome    `json:"outcome,omitempty"`
 	Created  int64              `json:"created,omitempty"`
-	Start    uint64             `json:"end,omitempty"`
+	Start    uint64             `json:"start,omitempty"`
 	End      uint64             `json:"end,omitempty"`
 	Duration int64              `json:"duration,omitempty"`
 	Provider string             `json:"provider,omitempty"`
